@@ -15,11 +15,18 @@ type Statement = {
 
 function createFakeDb() {
   const inserts: unknown[][] = [];
+  const statements: string[] = [];
 
   return {
     inserts,
+    statements,
     db: {
       prepare(sql: string): Statement {
+        statements.push(sql);
+        if (/\breturning\b/i.test(sql)) {
+          throw new Error("D1_ERROR: near \"returning\": syntax error");
+        }
+
         const statement: Statement = {
           bind(...values: unknown[]) {
             if (sql.includes("INSERT INTO analytics_events")) {
@@ -36,6 +43,9 @@ function createFakeDb() {
                 sampleCsvUsers: 1,
                 successfulExports: 2,
               } as T;
+            }
+            if (sql.includes("JOIN returning_visitors")) {
+              return { value: 2 } as T;
             }
 
             return { value: sql.includes("created_at >= datetime('now', '-1 minute')") ? 0 : 1 } as T;
@@ -189,8 +199,28 @@ describe("MapCSV Worker admin auth", () => {
         realCsvUsers: 3,
         sampleCsvUsers: 1,
         successfulExports: 2,
+        returningUsers: 2,
       },
     });
+  });
+
+  it("calculates returning users without using SQLite reserved identifiers", async () => {
+    const { env, fakeDb } = createEnv();
+    const cookie = await login(env);
+    const response = await worker.fetch(
+      request("/api/admin/summary?range=7d", { headers: { cookie } }),
+      env,
+    );
+    const summary = await response.json();
+    const returningMetricQuery = fakeDb.statements.find((sql) =>
+      sql.includes("JOIN returning_visitors"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(summary.kpis.returningUsers).toBe(2);
+    expect(returningMetricQuery).toBeDefined();
+    expect(returningMetricQuery).toContain("WITH returning_visitors AS");
+    expect(returningMetricQuery).not.toMatch(/\breturning\b/i);
   });
 
   it("rejects summary with an invalid session", async () => {

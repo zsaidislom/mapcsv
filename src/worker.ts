@@ -362,7 +362,7 @@ async function handleAdminSummary(request: Request, env: Env): Promise<Response>
 
   const returningUsers = await count(
     db,
-    `WITH returning AS (
+    `WITH returning_visitors AS (
        SELECT visitor_id
        FROM analytics_events
        GROUP BY visitor_id
@@ -370,7 +370,7 @@ async function handleAdminSummary(request: Request, env: Env): Promise<Response>
      )
      SELECT COUNT(DISTINCT events.visitor_id) AS value
      FROM analytics_events events
-     JOIN returning ON returning.visitor_id = events.visitor_id
+     JOIN returning_visitors ON returning_visitors.visitor_id = events.visitor_id
      WHERE ${eventsWhere}`,
   );
 
