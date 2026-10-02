@@ -1,9 +1,21 @@
 import { parseAnalyticsPayload } from "./lib/analyticsSchema";
+import {
+  adminSessionCookieName,
+  clearAdminSessionCookie,
+  compareAdminPassword,
+  createAdminSessionCookie,
+  createAdminSessionToken,
+  getCookie,
+  hasSameOrigin,
+  verifyAdminSessionToken,
+} from "./lib/adminAuth";
 
 type Env = {
   ASSETS: Fetcher;
   DB?: D1Database;
   ADMIN_DEV_BYPASS?: string;
+  ADMIN_PASSWORD?: string;
+  ADMIN_SESSION_SECRET?: string;
 };
 
 type RangeKey = "today" | "7d" | "30d" | "all";
@@ -42,6 +54,10 @@ type TrendRow = {
 const maxPayloadBytes = 2048;
 const maxSessionEventsPerMinute = 80;
 const exportEvents = "('export_csv', 'export_json', 'copy_json')";
+const maxFailedLoginAttempts = 8;
+const loginAttemptWindowMs = 10 * 60 * 1000;
+
+const failedLoginAttempts = new Map<string, { count: number; resetAt: number }>();
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -51,6 +67,18 @@ function jsonResponse(status: number, body: unknown): Response {
       "cache-control": "no-store",
     },
   });
+}
+
+function jsonResponseWithHeaders(
+  status: number,
+  body: unknown,
+  headers: Record<string, string>,
+): Response {
+  const response = jsonResponse(status, body);
+  for (const [key, value] of Object.entries(headers)) {
+    response.headers.set(key, value);
+  }
+  return response;
 }
 
 async function readJson(request: Request): Promise<unknown> {
@@ -135,15 +163,111 @@ async function handleEventIngestion(request: Request, env: Env): Promise<Respons
   return new Response(null, { status: 204 });
 }
 
-function isAuthorized(request: Request, env: Env): boolean {
+function loginRateLimitKey(request: Request): string {
+  return request.headers.get("cf-connecting-ip") ?? "unknown";
+}
+
+function isLoginRateLimited(request: Request, nowMs = Date.now()): boolean {
+  const key = loginRateLimitKey(request);
+  const attempt = failedLoginAttempts.get(key);
+
+  if (!attempt) {
+    return false;
+  }
+
+  if (attempt.resetAt <= nowMs) {
+    failedLoginAttempts.delete(key);
+    return false;
+  }
+
+  return attempt.count >= maxFailedLoginAttempts;
+}
+
+function recordFailedLogin(request: Request, nowMs = Date.now()): void {
+  const key = loginRateLimitKey(request);
+  const current = failedLoginAttempts.get(key);
+
+  if (!current || current.resetAt <= nowMs) {
+    failedLoginAttempts.set(key, {
+      count: 1,
+      resetAt: nowMs + loginAttemptWindowMs,
+    });
+    return;
+  }
+
+  current.count += 1;
+}
+
+function clearFailedLogins(request: Request): void {
+  failedLoginAttempts.delete(loginRateLimitKey(request));
+}
+
+async function isAuthorized(request: Request, env: Env): Promise<boolean> {
   if (env.ADMIN_DEV_BYPASS === "true") {
     return true;
   }
 
-  return Boolean(
-    request.headers.get("cf-access-authenticated-user-email") ||
-      request.headers.get("cf-access-jwt-assertion"),
+  return verifyAdminSessionToken(
+    getCookie(request.headers.get("cookie"), adminSessionCookieName),
+    env.ADMIN_SESSION_SECRET,
   );
+}
+
+async function handleAdminLogin(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "POST") {
+    return jsonResponse(405, { error: "method_not_allowed" });
+  }
+
+  if (!hasSameOrigin(request)) {
+    return jsonResponse(403, { error: "forbidden" });
+  }
+
+  if (isLoginRateLimited(request)) {
+    return jsonResponse(429, { error: "too_many_attempts" });
+  }
+
+  let payload: unknown;
+  try {
+    payload = await readJson(request);
+  } catch (error) {
+    const status = error instanceof Error && error.message === "payload_too_large" ? 413 : 400;
+    return jsonResponse(status, { error: "invalid_request" });
+  }
+
+  const password =
+    typeof payload === "object" && payload !== null && "password" in payload
+      ? (payload as { password?: unknown }).password
+      : undefined;
+  const isValidPassword = await compareAdminPassword(password, env.ADMIN_PASSWORD);
+
+  if (!isValidPassword) {
+    recordFailedLogin(request);
+    return jsonResponse(401, { error: "invalid_credentials" });
+  }
+
+  if (!env.ADMIN_SESSION_SECRET) {
+    return jsonResponse(503, { error: "admin_auth_unavailable" });
+  }
+
+  clearFailedLogins(request);
+  const session = await createAdminSessionToken(env.ADMIN_SESSION_SECRET);
+  return jsonResponseWithHeaders(200, { ok: true }, {
+    "set-cookie": createAdminSessionCookie(session.token, session.expires),
+  });
+}
+
+function handleAdminLogout(request: Request): Response {
+  if (request.method !== "POST") {
+    return jsonResponse(405, { error: "method_not_allowed" });
+  }
+
+  if (!hasSameOrigin(request)) {
+    return jsonResponse(403, { error: "forbidden" });
+  }
+
+  return jsonResponseWithHeaders(200, { ok: true }, {
+    "set-cookie": clearAdminSessionCookie(),
+  });
 }
 
 function rangeFromUrl(request: Request): RangeKey {
@@ -186,8 +310,8 @@ async function handleAdminSummary(request: Request, env: Env): Promise<Response>
     return jsonResponse(405, { error: "method_not_allowed" });
   }
 
-  if (!isAuthorized(request, env)) {
-    return jsonResponse(401, { error: "cloudflare_access_required" });
+  if (!(await isAuthorized(request, env))) {
+    return jsonResponse(401, { error: "authentication_required" });
   }
 
   if (!env.DB) {
@@ -379,6 +503,14 @@ export default {
 
     if (url.pathname === "/api/admin/summary") {
       return handleAdminSummary(request, env);
+    }
+
+    if (url.pathname === "/api/admin/login") {
+      return handleAdminLogin(request, env);
+    }
+
+    if (url.pathname === "/api/admin/logout") {
+      return handleAdminLogout(request);
     }
 
     return env.ASSETS.fetch(request);

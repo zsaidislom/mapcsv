@@ -17,3 +17,7 @@ database_id = "REPLACE_WITH_D1_DATABASE_ID"
 # Set this only for local development with `wrangler dev`.
 # Do not enable it in production.
 ADMIN_DEV_BYPASS = "false"
+
+# Set admin auth with Worker Secrets, not checked-in config:
+# pnpm wrangler secret put ADMIN_PASSWORD
+# pnpm wrangler secret put ADMIN_SESSION_SECRET

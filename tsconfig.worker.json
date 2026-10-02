@@ -12,6 +12,7 @@
   },
   "include": [
     "src/worker.ts",
+    "src/lib/adminAuth.ts",
     "src/lib/analyticsSchema.ts",
     "src/lib/analyticsAttribution.ts"
   ]

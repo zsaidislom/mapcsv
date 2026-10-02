@@ -42,7 +42,7 @@ Analytics events never include CSV contents, file names, headers, cell values, m
 - Lucide React
 - Cloudflare Worker with Static Assets
 - Cloudflare D1
-- Cloudflare Access for admin protection
+- Worker Secret based admin sessions
 
 ## Local Development
 
@@ -96,7 +96,7 @@ MapCSV deploys as one Cloudflare Worker named `mapcsv` with static assets and AP
 ```text
 Browser
   -> Worker static assets: /, /admin, JS/CSS
-  -> Worker API: POST /api/events, GET /api/admin/summary
+  -> Worker API: POST /api/events, POST /api/admin/login, POST /api/admin/logout, GET /api/admin/summary
   -> D1 binding: env.DB
 ```
 
@@ -130,7 +130,7 @@ The admin dashboard at `/admin` reads aggregated metrics from:
 GET /api/admin/summary?range=7d
 ```
 
-That admin endpoint must be protected by Cloudflare Access. The endpoint also refuses requests without Cloudflare Access headers unless `ADMIN_DEV_BYPASS=true` is explicitly set for local development.
+The admin API uses a password login backed by Worker Secrets and a signed HttpOnly session cookie. `GET /api/admin/summary` returns `401` unless the request has a valid untampered session.
 
 ## Event Schema
 
@@ -239,24 +239,20 @@ Do not create a second unrelated Pages project for this app.
 
 ## Admin Authentication
 
-Use Cloudflare Access. Do not add a client-side password.
+Admin authentication is handled inside the existing Worker. The frontend never stores the password or session in `localStorage`; the Worker sets a signed session cookie with `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`, and a roughly 24 hour lifetime.
 
-Recommended Access protection:
+Set the secrets before deploying:
 
-```text
-Application: MapCSV Admin
-Hostname/path: mapcsv.saidislom0613.workers.dev/admin*
-Also protect: mapcsv.saidislom0613.workers.dev/api/admin/*
-Policy: allow only your email address
+```bash
+pnpm wrangler secret put ADMIN_PASSWORD
+pnpm wrangler secret put ADMIN_SESSION_SECRET
 ```
 
-Later, when a custom domain exists, move the dashboard to:
+Do not put these values in `wrangler.toml`, source files, D1, logs, or chat messages.
 
-```text
-admin.mapcsv-domain.com
-```
+The Worker also checks same-origin `Origin` headers on admin login/logout requests and includes a simple in-memory failed-login limiter per Worker isolate. That limiter is free and requires no schema changes, but it is not a durable global rate limit across all Cloudflare isolates.
 
-or protect the `/admin*` and `/api/admin/*` paths on the production hostname.
+Use a long random value for `ADMIN_SESSION_SECRET`; changing it invalidates existing admin sessions.
 
 ## Local Admin Development
 
@@ -267,7 +263,7 @@ For local Worker testing only, set:
 ADMIN_DEV_BYPASS = "true"
 ```
 
-Only use that locally. Production should rely on Cloudflare Access headers.
+Only use that locally. Production should keep `ADMIN_DEV_BYPASS = "false"` and rely on `ADMIN_PASSWORD` plus `ADMIN_SESSION_SECRET` Worker Secrets.
 
 ## Adding Analytics Events Safely
 
@@ -291,4 +287,4 @@ pnpm build
 - Exports include only rows that pass validation.
 - Date validation accepts ISO-style dates and dates with month names; ambiguous numeric dates are rejected.
 - The dashboard is intentionally small and decision-focused.
-- Analytics requires D1 binding `DB` and Cloudflare Access configuration after deployment.
+- Analytics requires D1 binding `DB` and admin auth Worker Secrets after deployment.

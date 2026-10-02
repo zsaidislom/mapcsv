@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
   ArrowDown,
   BarChart3,
   Download,
   FileSpreadsheet,
   Lock,
+  LogOut,
   RefreshCw,
   Users,
 } from "lucide-react";
@@ -66,18 +67,28 @@ export function AdminDashboard() {
   const [summary, setSummary] = useState<DashboardSummary>();
   const [error, setError] = useState<string>();
   const [isLoading, setIsLoading] = useState(true);
+  const [authState, setAuthState] = useState<"checking" | "authenticated" | "unauthenticated">(
+    "checking",
+  );
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState<string>();
+  const [isLoginPending, setIsLoginPending] = useState(false);
   const trendMax = useMemo(() => maxTrend(summary), [summary]);
 
   useEffect(() => {
     const controller = new AbortController();
 
-    fetch(`/api/admin/summary?range=${range}`, {
-      signal: controller.signal,
-      credentials: "same-origin",
-    })
-      .then(async (response) => {
+    async function loadSummary() {
+      try {
+        const response = await fetch(`/api/admin/summary?range=${range}`, {
+          signal: controller.signal,
+          credentials: "same-origin",
+        });
+
         if (response.status === 401) {
-          throw new Error("Cloudflare Access authentication is required.");
+          setAuthState("unauthenticated");
+          setSummary(undefined);
+          return;
         }
         if (!response.ok) {
           throw new Error("Analytics summary is unavailable.");
@@ -85,25 +96,91 @@ export function AdminDashboard() {
         if (!response.headers.get("content-type")?.includes("application/json")) {
           throw new Error("Analytics summary is unavailable.");
         }
-        return response.json() as Promise<DashboardSummary>;
-      })
-      .then((nextSummary) => {
+
+        const nextSummary = (await response.json()) as DashboardSummary;
         setSummary(nextSummary);
-        setError(undefined);
-      })
-      .catch((caughtError) => {
+        setAuthState("authenticated");
+        setLoginError(undefined);
+      } catch (caughtError) {
         if (!controller.signal.aborted) {
           setError(caughtError instanceof Error ? caughtError.message : "Unable to load analytics.");
         }
-      })
-      .finally(() => {
+      } finally {
         if (!controller.signal.aborted) {
           setIsLoading(false);
         }
-      });
+      }
+    }
+
+    void loadSummary();
 
     return () => controller.abort();
   }, [range, refreshToken]);
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsLoginPending(true);
+    setLoginError(undefined);
+
+    try {
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify({ password }),
+      });
+
+      if (response.status === 401) {
+        setLoginError("Invalid password.");
+        return;
+      }
+      if (response.status === 429) {
+        setLoginError("Too many attempts. Try again later.");
+        return;
+      }
+      if (!response.ok) {
+        setLoginError("Admin login is unavailable.");
+        return;
+      }
+
+      setPassword("");
+      setAuthState("authenticated");
+      setIsLoading(true);
+      setError(undefined);
+      setRefreshToken((current) => current + 1);
+    } catch {
+      setLoginError("Admin login is unavailable.");
+    } finally {
+      setIsLoginPending(false);
+    }
+  }
+
+  async function handleLogout() {
+    await fetch("/api/admin/logout", {
+      method: "POST",
+      credentials: "same-origin",
+    }).catch(() => undefined);
+
+    setSummary(undefined);
+    setAuthState("unauthenticated");
+    setPassword("");
+  }
+
+  const showLogin = authState === "unauthenticated";
+
+  function selectRange(nextRange: RangeKey) {
+    setIsLoading(true);
+    setError(undefined);
+    setRange(nextRange);
+  }
+
+  function refreshSummary() {
+    setIsLoading(true);
+    setError(undefined);
+    setRefreshToken((current) => current + 1);
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
@@ -120,50 +197,99 @@ export function AdminDashboard() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {ranges.map((option) => (
-              <button
-                key={option.key}
-                type="button"
-                onClick={() => setRange(option.key)}
-                className={`rounded-md border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-accent-500 ${
-                  range === option.key
-                    ? "border-zinc-950 bg-zinc-950 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-950"
-                    : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
+            {!showLogin
+              ? ranges.map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => selectRange(option.key)}
+                    className={`rounded-md border px-3 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-accent-500 ${
+                      range === option.key
+                        ? "border-zinc-950 bg-zinc-950 text-white dark:border-zinc-100 dark:bg-zinc-100 dark:text-zinc-950"
+                        : "border-zinc-200 bg-white text-zinc-600 hover:border-zinc-300 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))
+              : null}
+            {authState === "authenticated" ? (
+              <Button type="button" variant="ghost" onClick={handleLogout}>
+                <LogOut className="size-4" aria-hidden="true" />
+                Logout
+              </Button>
+            ) : null}
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6">
-        <div className="flex flex-col justify-between gap-3 rounded-md border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950 sm:flex-row sm:items-center">
+        {showLogin ? (
+          <section className="mx-auto max-w-md rounded-md border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+            <div className="mb-6 flex items-center gap-3">
+              <div className="flex size-10 items-center justify-center rounded-md bg-accent-50 text-accent-700 dark:bg-accent-950/40 dark:text-accent-400">
+                <Lock className="size-5" aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Admin login</h2>
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                  Protected by a server-side session cookie.
+                </p>
+              </div>
+            </div>
+
+            <form className="space-y-4" onSubmit={handleLogin}>
+              <label className="block text-sm font-medium" htmlFor="admin-password">
+                Password
+              </label>
+              <input
+                id="admin-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-base text-zinc-950 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/25 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50"
+              />
+
+              {loginError ? (
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                  {loginError}
+                </div>
+              ) : null}
+
+              <Button type="submit" variant="primary" disabled={isLoginPending} className="w-full">
+                <Lock className="size-4" aria-hidden="true" />
+                {isLoginPending ? "Signing in..." : "Sign in"}
+              </Button>
+            </form>
+          </section>
+        ) : (
+          <div className="flex flex-col justify-between gap-3 rounded-md border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950 sm:flex-row sm:items-center">
           <div className="flex items-start gap-3 text-sm text-zinc-600 dark:text-zinc-400">
             <Lock className="mt-0.5 size-4 shrink-0 text-accent-600" aria-hidden="true" />
             <p>
-              Dashboard access should be protected by Cloudflare Access. CSV data, file names,
-              headers, values, mapped names, and exports are never collected.
+              Dashboard access is protected by a server-side session. CSV data, file names, headers,
+              values, mapped names, and exports are never collected.
             </p>
           </div>
-          <Button type="button" onClick={() => setRefreshToken((current) => current + 1)}>
+          <Button type="button" onClick={refreshSummary}>
             <RefreshCw className="size-4" aria-hidden="true" />
             Refresh
           </Button>
         </div>
+        )}
 
-        {error ? (
+        {!showLogin && error ? (
           <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
             {error}
           </div>
         ) : null}
 
-        {isLoading ? (
+        {!showLogin && isLoading ? (
           <div className="rounded-md border border-zinc-200 bg-white p-8 text-sm text-zinc-500 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
             Loading analytics...
           </div>
-        ) : summary ? (
+        ) : !showLogin && summary ? (
           <>
             <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <Stat label="Visitors" value={summary.kpis.visitors.toLocaleString()} />
