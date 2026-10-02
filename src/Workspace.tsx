@@ -10,6 +10,8 @@ import { ValidationStep } from "./features/validation/ValidationStep";
 import { steps } from "./lib/steps";
 import { validateDataset } from "./lib/validation";
 import type { ColumnMapping, CsvDataset, StepId } from "./types";
+import type { AnalyticsClient } from "./lib/analyticsClient";
+import type { WorkflowType } from "./lib/analyticsSchema";
 
 type ThemeMode = "system" | "light" | "dark";
 
@@ -23,6 +25,8 @@ type WorkspaceProps = {
   onStepChange: (step: StepId) => void;
   onMappingsChange: (mappings: ColumnMapping[]) => void;
   onReset: () => void;
+  workflowType: WorkflowType;
+  onTrack: AnalyticsClient["track"];
 };
 
 export function Workspace({
@@ -35,6 +39,8 @@ export function Workspace({
   onStepChange,
   onMappingsChange,
   onReset,
+  workflowType,
+  onTrack,
 }: WorkspaceProps) {
   const validation = validateDataset(dataset, mappings);
   const currentIndex = steps.findIndex((step) => step.id === currentStep);
@@ -131,7 +137,13 @@ export function Workspace({
               <ValidationStep validation={validation} onContinue={() => onStepChange("export")} />
             ) : null}
             {currentStep === "export" ? (
-              <ExportStep dataset={dataset} mappings={mappings} validation={validation} />
+              <ExportStep
+                dataset={dataset}
+                mappings={mappings}
+                validation={validation}
+                workflowType={workflowType}
+                onTrack={onTrack}
+              />
             ) : null}
           </div>
         </main>

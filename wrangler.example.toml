@@ -1,0 +1,19 @@
+name = "mapcsv"
+main = "src/worker.ts"
+compatibility_date = "2026-10-02"
+workers_dev = true
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mapcsv_analytics"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[vars]
+# Set this only for local development with `wrangler dev`.
+# Do not enable it in production.
+ADMIN_DEV_BYPASS = "false"

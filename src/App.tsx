@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { AdminDashboard } from "./admin/AdminDashboard";
 import { UploadScreen } from "./features/upload/UploadScreen";
 import { sampleCsv } from "./data/sampleCsv";
+import { createAnalyticsClient } from "./lib/analyticsClient";
 import { parseCsvFile, parseCsvText } from "./lib/csv";
 import { createDefaultMappings } from "./lib/mapping";
 import { Workspace } from "./Workspace";
 import type { ColumnMapping, CsvDataset, StepId } from "./types";
+import type { WorkflowType } from "./lib/analyticsSchema";
 
 type ThemeMode = "system" | "light" | "dark";
 
@@ -37,8 +40,10 @@ export default function App() {
   const [mappings, setMappings] = useState<ColumnMapping[]>([]);
   const [currentStep, setCurrentStep] = useState<StepId>("upload");
   const [maxStepIndex, setMaxStepIndex] = useState(0);
+  const [workflowType, setWorkflowType] = useState<WorkflowType>("none");
   const [error, setError] = useState<string>();
   const [isParsing, setIsParsing] = useState(false);
+  const analytics = useMemo(() => createAnalyticsClient(), []);
 
   const resolvedTheme = useMemo(() => {
     if (themeMode !== "system") {
@@ -53,7 +58,17 @@ export default function App() {
     window.localStorage.setItem("mapcsv-theme", themeMode);
   }, [resolvedTheme, themeMode]);
 
-  function loadDataset(nextDataset: CsvDataset) {
+  useEffect(() => {
+    if (!window.location.pathname.startsWith("/admin")) {
+      analytics.track("page_view");
+    }
+  }, [analytics]);
+
+  if (window.location.pathname.startsWith("/admin")) {
+    return <AdminDashboard />;
+  }
+
+  function loadDataset(nextDataset: CsvDataset, nextWorkflowType: WorkflowType) {
     const problem = datasetError(nextDataset);
     if (problem) {
       setError(problem);
@@ -62,9 +77,15 @@ export default function App() {
 
     setDataset(nextDataset);
     setMappings(createDefaultMappings(nextDataset));
+    setWorkflowType(nextWorkflowType);
     setCurrentStep("preview");
     setMaxStepIndex(1);
     setError(undefined);
+    analytics.track(
+      nextWorkflowType === "sample" ? "sample_csv_parsed" : "local_csv_parsed",
+      { workflowType: nextWorkflowType },
+    );
+    analytics.track("preview_opened", { workflowType: nextWorkflowType });
   }
 
   async function handleFile(file: File) {
@@ -78,7 +99,7 @@ export default function App() {
     setIsParsing(true);
     try {
       const parsed = await parseCsvFile(file);
-      loadDataset(parsed);
+      loadDataset(parsed, "local");
     } catch (caughtError) {
       setError(
         caughtError instanceof Error
@@ -95,7 +116,7 @@ export default function App() {
     setIsParsing(true);
     try {
       const parsed = await parseCsvText(sampleCsv, "sample-customers.csv");
-      loadDataset(parsed);
+      loadDataset(parsed, "sample");
     } finally {
       setIsParsing(false);
     }
@@ -109,6 +130,16 @@ export default function App() {
 
     setCurrentStep(step);
     setMaxStepIndex((current) => Math.max(current, index));
+
+    if (step === "preview") {
+      analytics.track("preview_opened", { workflowType });
+    }
+    if (step === "mapping") {
+      analytics.track("mapping_opened", { workflowType });
+    }
+    if (step === "validation") {
+      analytics.track("validation_run", { workflowType });
+    }
   }
 
   function reset() {
@@ -116,6 +147,7 @@ export default function App() {
     setMappings([]);
     setCurrentStep("upload");
     setMaxStepIndex(0);
+    setWorkflowType("none");
     setError(undefined);
   }
 
@@ -143,6 +175,8 @@ export default function App() {
       onStepChange={updateStep}
       onMappingsChange={setMappings}
       onReset={reset}
+      workflowType={workflowType}
+      onTrack={analytics.track}
     />
   );
 }

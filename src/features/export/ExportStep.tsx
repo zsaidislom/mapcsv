@@ -9,14 +9,24 @@ import {
   getTransformedRows,
 } from "../../lib/export";
 import type { ColumnMapping, CsvDataset, ValidationResult } from "../../types";
+import type { AnalyticsClient } from "../../lib/analyticsClient";
+import type { WorkflowType } from "../../lib/analyticsSchema";
 
 type ExportStepProps = {
   dataset: CsvDataset;
   mappings: ColumnMapping[];
   validation: ValidationResult;
+  workflowType: WorkflowType;
+  onTrack: AnalyticsClient["track"];
 };
 
-export function ExportStep({ dataset, mappings, validation }: ExportStepProps) {
+export function ExportStep({
+  dataset,
+  mappings,
+  validation,
+  workflowType,
+  onTrack,
+}: ExportStepProps) {
   const [copied, setCopied] = useState(false);
   const rows = useMemo(
     () => getTransformedRows(dataset, mappings, validation),
@@ -28,8 +38,19 @@ export function ExportStep({ dataset, mappings, validation }: ExportStepProps) {
 
   async function copyJson() {
     await navigator.clipboard.writeText(json);
+    onTrack("copy_json", { workflowType, exportFormat: "copy_json" });
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
+  }
+
+  function downloadJson() {
+    downloadTextFile(json, `${baseName}.json`, "application/json");
+    onTrack("export_json", { workflowType, exportFormat: "json" });
+  }
+
+  function downloadCsv() {
+    downloadTextFile(csv, `${baseName}-clean.csv`, "text/csv");
+    onTrack("export_csv", { workflowType, exportFormat: "csv" });
   }
 
   return (
@@ -62,7 +83,7 @@ export function ExportStep({ dataset, mappings, validation }: ExportStepProps) {
         <Button
           type="button"
           variant="primary"
-          onClick={() => downloadTextFile(json, `${baseName}.json`, "application/json")}
+          onClick={downloadJson}
           disabled={rows.length === 0}
         >
           <Download className="size-4" aria-hidden="true" />
@@ -70,7 +91,7 @@ export function ExportStep({ dataset, mappings, validation }: ExportStepProps) {
         </Button>
         <Button
           type="button"
-          onClick={() => downloadTextFile(csv, `${baseName}-clean.csv`, "text/csv")}
+          onClick={downloadCsv}
           disabled={rows.length === 0}
         >
           <Download className="size-4" aria-hidden="true" />

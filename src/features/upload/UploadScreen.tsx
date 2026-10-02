@@ -136,6 +136,11 @@ export function UploadScreen({
               Files are parsed, mapped, validated, and exported locally on this device.
             </span>
           </div>
+          <p className="mt-3 text-center text-xs leading-5 text-zinc-500 dark:text-zinc-500">
+            MapCSV collects anonymous product-usage events to understand how the product is used.
+            File names, headers, cell contents, mapped fields, and exported data are never
+            collected.
+          </p>
         </section>
       </main>
     </div>
