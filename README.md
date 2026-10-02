@@ -1,71 +1,108 @@
 # MapCSV
 
-MapCSV is a privacy-first browser tool for making messy CSVs usable. It helps developers and technical users upload a CSV, preview the data, map columns to clean output fields, validate rows, and export structured JSON or clean CSV.
+**Make messy CSVs usable.**
 
-Tagline: **Make messy CSVs usable.**
+MapCSV helps you map columns, validate data, and export clean CSV or JSON directly in your browser.
 
-## Privacy
+CSV data stays in your browser. No signup required.
 
-MapCSV runs CSV parsing, mapping, validation, and export generation locally in the browser.
+[![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+![TypeScript](https://img.shields.io/badge/TypeScript-6.x-blue.svg)
+![React](https://img.shields.io/badge/React-19-61dafb.svg)
+![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-f38020.svg)
 
-MapCSV v0.2 adds anonymous product analytics, but the core promise remains true:
+## Try MapCSV
 
-**Your CSV data never leaves your browser.**
+[Open MapCSV ->](https://mapcsv.saidislom0613.workers.dev)
 
-Analytics events never include CSV contents, file names, headers, cell values, mapped field names, validation values, exported CSV, exported JSON, names, emails, phone numbers, or other CSV-derived text.
+## MapCSV in Action
+
+![MapCSV upload screen with local-first CSV privacy message](docs/images/mapcsv-upload.png)
+
+![MapCSV CSV preview interface showing detected rows and columns](docs/images/mapcsv-preview.png)
+
+![MapCSV export screen showing clean JSON and CSV export options](docs/images/mapcsv-export.png)
+
+## How It Works
+
+MapCSV follows a simple local-first workflow:
+
+```text
+Upload -> Preview -> Map -> Validate -> Export
+```
+
+1. Upload a `.csv` file or try the built-in sample.
+2. Preview detected columns, row count, delimiter, and parser issues.
+3. Map inconsistent source columns to clean output field names.
+4. Validate rows using field types and required-field rules.
+5. Export valid rows as clean CSV, download JSON, or copy JSON.
 
 ## Features
 
-- Drag-and-drop or file-picker CSV upload
-- Local sample CSV for trying the workflow
-- Client-side CSV parsing with Papa Parse
-- Preview of detected columns, row count, delimiter, and parser warnings
-- Deterministic default output field names from source headers
+- Browser-based CSV parsing with Papa Parse
+- Drag-and-drop and file picker upload
+- Built-in sample CSV for quick testing
+- CSV preview with detected rows, columns, delimiter, and parser warnings
 - Column mapping with output name, type, required, and ignore controls
-- Duplicate output field name warning
-- Row validation for string, number, email, date, boolean, and required fields
+- Validation for string, number, email, date, boolean, and required fields
+- Duplicate output field name warnings
 - Row-level validation issue table
-- Export of valid rows as JSON or clean CSV
+- Clean CSV export
+- JSON export
 - Copy JSON to clipboard
 - Light, dark, and system theme modes
-- Anonymous privacy-safe product analytics
-- Private admin analytics dashboard at `/admin`
+- No signup
+- Local-first CSV processing
+- Open source under MIT
 
-## Technology Stack
+## Privacy
 
-- React
-- TypeScript
-- Vite
+CSV parsing, mapping, validation, and export generation happen locally in your browser.
+
+CSV contents and CSV-derived data are not sent to MapCSV servers. MapCSV does not collect CSV contents, filenames, headers, cell values, mapped field names, emails, phone numbers, names contained inside CSV data, exported CSV/JSON, validation values, or other CSV-derived text.
+
+MapCSV does collect anonymous product usage events so the project can understand which parts of the workflow are being used. Those events are limited to product metadata such as event names, anonymous visitor/session IDs, app version, workflow type, export format, and basic attribution.
+
+## Tech Stack
+
+- React 19
+- TypeScript 6
+- Vite 8
 - Tailwind CSS
 - Papa Parse
 - Zod
 - Lucide React
-- Cloudflare Worker with Static Assets
+- Cloudflare Workers with Static Assets
 - Cloudflare D1
-- Worker Secret based admin sessions
+- Vitest
+- ESLint
 
-## Local Development
+## Run Locally
 
-Install dependencies:
+Prerequisites:
+
+- Node.js
+- pnpm
+
+Clone and run the public frontend:
 
 ```bash
+git clone https://github.com/zsaidislom/mapcsv.git
+cd mapcsv
 pnpm install
-```
-
-Start the Vite public app only:
-
-```bash
 pnpm dev
 ```
 
-For Worker/API local testing, build first and then run Wrangler:
+The basic frontend workflow does not require Cloudflare or D1. For Worker/API local testing, build first and run Wrangler:
 
 ```bash
 pnpm build
 pnpm wrangler dev
 ```
 
-Run checks:
+## Testing
+
+Available checks:
 
 ```bash
 pnpm test
@@ -74,65 +111,35 @@ pnpm typecheck:worker
 pnpm build
 ```
 
-## Project Structure
+## Architecture
+
+MapCSV is deployed as one Cloudflare Worker named `mapcsv`.
 
 ```text
-src/
-  admin/             Private analytics dashboard UI
-  components/        Shared UI and navigation
-  data/              Local sample CSV data
-  features/          Upload, preview, mapping, validation, and export screens
-  lib/               CSV, validation, export, and analytics logic
-  types/             Shared TypeScript types
-  worker.ts          Cloudflare Worker API routes + static asset fallback
-migrations/
-  0001_analytics_events.sql
+Browser UI
+  -> local CSV parsing, mapping, validation, export
+  -> privacy-safe analytics event metadata
+  -> Cloudflare Worker
+  -> Cloudflare D1
 ```
 
-## Deployment Architecture
+The same Worker serves the Vite static assets and API routes:
 
-MapCSV deploys as one Cloudflare Worker named `mapcsv` with static assets and API routes in the same Worker.
+- Static assets and SPA routes: `/`, `/admin`, JS, CSS
+- Public analytics ingestion: `POST /api/events`
+- Private admin API: `POST /api/admin/login`, `POST /api/admin/logout`, `GET /api/admin/summary`
 
-```text
-Browser
-  -> Worker static assets: /, /admin, JS/CSS
-  -> Worker API: POST /api/events, POST /api/admin/login, POST /api/admin/logout, GET /api/admin/summary
-  -> D1 binding: env.DB
-```
+CSV contents remain browser-local and are not part of the analytics flow.
 
-The Worker uses:
+## Privacy-Safe Analytics
 
-```toml
-main = "src/worker.ts"
-workers_dev = true
-
-[assets]
-directory = "./dist"
-binding = "ASSETS"
-not_found_handling = "single-page-application"
-```
-
-This preserves the existing workers.dev style URL instead of creating a separate Pages project.
-
-## Analytics Architecture
-
-The public frontend sends small anonymous events to:
+The public app sends small anonymous events to:
 
 ```text
 POST /api/events
 ```
 
-The Cloudflare Worker validates the event, rejects unknown fields, rate-limits obvious per-session spam, and stores accepted events in D1.
-
-The admin dashboard at `/admin` reads aggregated metrics from:
-
-```text
-GET /api/admin/summary?range=7d
-```
-
-The admin API uses a password login backed by Worker Secrets and a signed HttpOnly session cookie. `GET /api/admin/summary` returns `401` unless the request has a valid untampered session.
-
-## Event Schema
+The Worker validates each event, rejects unknown fields, rate-limits obvious per-session spam, and stores accepted event metadata in D1.
 
 Allowed event names:
 
@@ -159,55 +166,80 @@ Allowed payload fields:
 - `attribution.campaign`
 - `occurredAt`
 
-Do not add event fields that can contain CSV-derived data.
+MapCSV generates an anonymous `visitorId` in `localStorage` and a `sessionId` in `sessionStorage`. This supports approximate product metrics without accounts, fingerprinting, IP storage, or device profiling.
 
-## Anonymous Visitor And Session Model
-
-MapCSV generates:
-
-- `visitorId`: random UUID stored in `localStorage`
-- `sessionId`: random UUID stored in `sessionStorage`
-
-This allows approximate returning-user and session metrics without accounts, fingerprinting, IP storage, or device profiling.
-
-## UTM Support
-
-MapCSV supports:
-
-- `utm_source`
-- `utm_medium`
-- `utm_campaign`
-
-Values are lowercased, length-limited, and stripped to a conservative character set. If no UTM source exists, MapCSV stores a simple source derived from known referrer hosts where possible, otherwise `direct` or `other`.
-
-## Core Metric
+UTM support includes `utm_source`, `utm_medium`, and `utm_campaign`. Values are normalized and length-limited before storage.
 
 The main product metric is:
 
-**Successful exports from real CSV workflows per week.**
-
-In the dashboard this is counted as unique sessions with export events where `workflowType = "local"` over the last 7 days.
-
-The Real CSV -> Export conversion rate is:
-
 ```text
-unique sessions with local_csv_parsed and at least one export
-/
-unique sessions with local_csv_parsed
+Successful exports from real CSV workflows per week
 ```
 
-One session exporting multiple times counts as one converted session for conversion-rate purposes.
+This is counted as unique sessions with export events where `workflowType = "local"` over the last 7 days.
 
-## Cloudflare Setup
+## Adding Analytics Events Safely
 
-D1 database expected by this project:
+When adding analytics, do not include CSV-derived data.
 
-```text
-database_name = "mapcsv_analytics"
-binding = "DB"
+1. Add the event name to `analyticsEventNames` in `src/lib/analyticsSchema.ts`.
+2. Add only non-sensitive metadata.
+3. Update tests in `src/lib/*analytics*.test.ts`.
+4. Search the payload path and verify no CSV-derived text can enter it.
+5. Run:
+
+```bash
+pnpm test
+pnpm lint
+pnpm typecheck:worker
+pnpm build
 ```
 
-In `wrangler.toml`, set the existing D1 id:
+## Admin Dashboard
+
+MapCSV includes a private analytics dashboard for product operations. It is not a public product feature.
+
+The dashboard reads aggregated metrics from:
+
+```text
+GET /api/admin/summary?range=7d
+```
+
+Admin authentication is handled inside the Worker:
+
+- `ADMIN_PASSWORD` is stored as a Cloudflare Worker Secret.
+- `ADMIN_SESSION_SECRET` is stored as a Cloudflare Worker Secret.
+- Successful login creates a signed `HttpOnly`, `Secure`, `SameSite=Strict` session cookie.
+- The frontend does not store the password or session in `localStorage`.
+- `GET /api/admin/summary` returns `401` without a valid session.
+
+Set the secrets with Wrangler:
+
+```bash
+pnpm wrangler secret put ADMIN_PASSWORD
+pnpm wrangler secret put ADMIN_SESSION_SECRET
+```
+
+Do not put secret values in `wrangler.toml`, source files, D1, logs, or chat messages.
+
+For local Worker testing only, `ADMIN_DEV_BYPASS` may be set to `"true"`. Production should keep it `"false"`.
+
+## Deployment
+
+MapCSV uses Cloudflare Workers with Static Assets, configured in `wrangler.toml`:
+
+```toml
+name = "mapcsv"
+main = "src/worker.ts"
+workers_dev = true
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+```
+
+The Worker expects a D1 binding named `DB`:
 
 ```toml
 [[d1_databases]]
@@ -222,69 +254,50 @@ The first migration is:
 migrations/0001_analytics_events.sql
 ```
 
-Apply migrations only if needed:
+Apply migrations only when needed:
 
 ```bash
 pnpm wrangler d1 migrations apply mapcsv_analytics --remote
 ```
 
-Deploy the existing Worker/static-assets app:
+Deploy the Worker/static-assets app:
 
 ```bash
 pnpm build
 pnpm wrangler deploy
 ```
 
-Do not create a second unrelated Pages project for this app.
+Do not create a separate Cloudflare Pages project for this app.
 
-## Admin Authentication
+## Project Structure
 
-Admin authentication is handled inside the existing Worker. The frontend never stores the password or session in `localStorage`; the Worker sets a signed session cookie with `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/`, and a roughly 24 hour lifetime.
-
-Set the secrets before deploying:
-
-```bash
-pnpm wrangler secret put ADMIN_PASSWORD
-pnpm wrangler secret put ADMIN_SESSION_SECRET
+```text
+src/
+  admin/             Private analytics dashboard UI
+  components/        Shared UI and navigation
+  data/              Local sample CSV data
+  features/          Upload, preview, mapping, validation, and export screens
+  lib/               CSV, validation, export, analytics, and admin auth logic
+  types/             Shared TypeScript types
+  worker.ts          Cloudflare Worker API routes + static asset fallback
+migrations/
+  0001_analytics_events.sql
+docs/images/
+  Product screenshots used by this README
 ```
 
-Do not put these values in `wrangler.toml`, source files, D1, logs, or chat messages.
-
-The Worker also checks same-origin `Origin` headers on admin login/logout requests and includes a simple in-memory failed-login limiter per Worker isolate. That limiter is free and requires no schema changes, but it is not a durable global rate limit across all Cloudflare isolates.
-
-Use a long random value for `ADMIN_SESSION_SECRET`; changing it invalidates existing admin sessions.
-
-## Local Admin Development
-
-For local Worker testing only, set:
-
-```toml
-[vars]
-ADMIN_DEV_BYPASS = "true"
-```
-
-Only use that locally. Production should keep `ADMIN_DEV_BYPASS = "false"` and rely on `ADMIN_PASSWORD` plus `ADMIN_SESSION_SECRET` Worker Secrets.
-
-## Adding Analytics Events Safely
-
-1. Add the event name to `analyticsEventNames` in `src/lib/analyticsSchema.ts`.
-2. Add only non-sensitive metadata.
-3. Update tests in `src/lib/*analytics*.test.ts`.
-4. Search for the event payload and verify no CSV-derived data can enter it.
-5. Run:
-
-```bash
-pnpm test
-pnpm lint
-pnpm typecheck:worker
-pnpm build
-```
-
-## Current MVP Limitations
+## Current Limitations
 
 - CSV only; XLS and XLSX are not supported.
-- No saved projects or browser persistence for mapping sessions.
+- Mapping sessions are not saved between browser sessions.
 - Exports include only rows that pass validation.
 - Date validation accepts ISO-style dates and dates with month names; ambiguous numeric dates are rejected.
-- The dashboard is intentionally small and decision-focused.
-- Analytics requires D1 binding `DB` and admin auth Worker Secrets after deployment.
+- The analytics dashboard is intentionally small and focused on product usage metrics.
+
+## Contributing
+
+Issues and pull requests are welcome. If you change CSV parsing, validation, export behavior, analytics, or Worker routes, please include focused tests and run the full check suite before opening a pull request.
+
+## License
+
+MapCSV is licensed under the [MIT License](LICENSE).
