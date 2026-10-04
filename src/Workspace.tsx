@@ -50,13 +50,13 @@ export function Workspace({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
+    <div className="app-bg min-h-screen text-zinc-950 dark:text-zinc-50">
       <header className="sticky top-0 z-20 border-b border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-850 dark:bg-zinc-950/90">
-        <div className="flex h-16 items-center justify-between px-4 sm:px-6">
+        <div className="flex h-16 items-center justify-between px-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-4">
             <Logo />
             <div className="hidden h-6 w-px bg-zinc-200 dark:bg-zinc-800 sm:block" />
-            <div className="min-w-0">
+            <div className="min-w-0 max-w-[42vw] sm:max-w-sm">
               <p className="truncate text-sm font-medium text-zinc-800 dark:text-zinc-200">
                 {dataset.fileName}
               </p>
@@ -84,10 +84,10 @@ export function Workspace({
         </div>
       </header>
 
-      <div className="flex min-h-[calc(100vh-4rem)]">
+      <div className="flex min-h-[calc(100vh-4rem)] flex-col lg:flex-row">
         <StepNav currentStep={currentStep} maxStepIndex={maxStepIndex} onSelect={goToStep} />
         <main className="min-w-0 flex-1">
-          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          <div key={currentStep} className="animate-enter mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
             <div className="mb-5 text-xs font-medium text-zinc-500 dark:text-zinc-400 lg:hidden">
               Step {currentIndex + 1} of {steps.length}
             </div>

@@ -45,8 +45,8 @@ export function ValidationStep({ validation, onContinue }: ValidationStepProps) 
           All rows passed validation.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-          <div className="border-b border-zinc-200 px-4 py-3 text-sm font-medium text-zinc-700 dark:border-zinc-800 dark:text-zinc-300">
+        <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-polished dark:border-zinc-800 dark:bg-zinc-950">
+          <div className="border-b border-zinc-200 bg-zinc-50/70 px-4 py-3 text-sm font-medium text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-300">
             Row-level issues
           </div>
           <div className="max-h-[520px] overflow-auto">

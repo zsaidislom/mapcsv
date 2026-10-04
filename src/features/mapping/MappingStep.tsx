@@ -66,7 +66,7 @@ export function MappingStep({
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-polished dark:border-zinc-800 dark:bg-zinc-950">
         <div className="grid grid-cols-[minmax(180px,1fr)_minmax(260px,1.2fr)_160px_110px_100px] gap-4 border-b border-zinc-200 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-normal text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/70 dark:text-zinc-400 max-xl:hidden">
           <span>Source</span>
           <span>Output field</span>
@@ -83,7 +83,7 @@ export function MappingStep({
             return (
               <div
                 key={mapping.sourceColumn}
-                className={`grid gap-4 px-4 py-4 transition xl:grid-cols-[minmax(180px,1fr)_minmax(260px,1.2fr)_160px_110px_100px] xl:items-center ${
+                className={`grid gap-4 px-4 py-4 transition-colors duration-150 xl:grid-cols-[minmax(180px,1fr)_minmax(260px,1.2fr)_160px_110px_100px] xl:items-center hover:bg-zinc-50/60 dark:hover:bg-zinc-900/30 ${
                   mapping.ignored ? "bg-zinc-50/70 opacity-70 dark:bg-zinc-900/40" : ""
                 }`}
               >

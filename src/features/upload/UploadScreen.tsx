@@ -34,7 +34,7 @@ export function UploadScreen({
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
+    <div className="app-bg min-h-screen text-zinc-950 dark:text-zinc-50">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
         <Logo />
         <div className="flex items-center gap-3">
@@ -48,9 +48,9 @@ export function UploadScreen({
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-6xl flex-col px-5 pb-14 pt-12 sm:px-8 lg:pt-20">
-        <section className="mx-auto w-full max-w-3xl text-center">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-sm text-zinc-600 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+      <main className="mx-auto flex w-full max-w-6xl flex-col px-5 pb-14 pt-10 sm:px-8 sm:pt-14 lg:pt-20">
+        <section className="animate-enter mx-auto w-full max-w-3xl text-center">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-zinc-200/90 bg-white/80 px-3 py-1.5 text-sm text-zinc-600 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70 dark:text-zinc-300">
             <Lock className="size-3.5 text-accent-600" aria-hidden="true" />
             Your data never leaves your browser.
           </div>
@@ -63,7 +63,7 @@ export function UploadScreen({
           </p>
         </section>
 
-        <section className="mx-auto mt-10 w-full max-w-3xl">
+        <section className="animate-enter mx-auto mt-9 w-full max-w-3xl [animation-delay:70ms] motion-reduce:[animation-delay:0ms]">
           <input
             ref={inputRef}
             type="file"
@@ -89,13 +89,13 @@ export function UploadScreen({
               setIsDragging(false);
               handleFiles(event.dataTransfer.files);
             }}
-            className={`group rounded-lg border border-dashed p-8 text-center shadow-soft transition sm:p-12 ${
+            className={`group rounded-lg border border-dashed p-7 text-center shadow-polished transition duration-200 ease-out sm:p-12 ${
               isDragging
-                ? "border-accent-500 bg-accent-50 dark:bg-accent-950/20"
-                : "border-zinc-300 bg-white hover:border-zinc-400 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:border-zinc-700"
+                ? "scale-[1.005] border-accent-500 bg-accent-50 shadow-md dark:bg-accent-950/20"
+                : "border-zinc-300/90 bg-white/90 hover:border-accent-300 dark:border-zinc-800 dark:bg-zinc-950/80 dark:hover:border-accent-900"
             }`}
           >
-            <div className="mx-auto grid size-12 place-items-center rounded-md border border-zinc-200 bg-zinc-50 text-zinc-600 transition group-hover:text-zinc-950 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:group-hover:text-zinc-100">
+            <div className="mx-auto grid size-12 place-items-center rounded-md border border-zinc-200 bg-zinc-50 text-zinc-600 shadow-sm transition duration-200 group-hover:border-accent-200 group-hover:text-accent-700 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-400 dark:group-hover:border-accent-900 dark:group-hover:text-accent-400">
               <Upload className="size-5" aria-hidden="true" />
             </div>
             <h2 className="mt-5 text-xl font-semibold text-zinc-950 dark:text-zinc-50">
@@ -130,7 +130,7 @@ export function UploadScreen({
             ) : null}
           </div>
 
-          <div className="mt-5 flex flex-col items-center justify-between gap-3 rounded-md border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400 sm:flex-row">
+          <div className="mt-4 flex flex-col items-center justify-between gap-3 rounded-md border border-zinc-200/90 bg-white/75 px-4 py-3 text-center text-sm text-zinc-600 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-300 sm:flex-row sm:text-left">
             <span>No signup • Private • Free</span>
             <span id="about">
               Files are parsed, mapped, validated, and exported locally on this device.

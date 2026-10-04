@@ -79,7 +79,7 @@ export function ExportStep({
         />
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
         <Button
           type="button"
           variant="primary"
@@ -97,7 +97,12 @@ export function ExportStep({
           <Download className="size-4" aria-hidden="true" />
           Download clean CSV
         </Button>
-        <Button type="button" onClick={copyJson} disabled={rows.length === 0}>
+        <Button
+          type="button"
+          onClick={copyJson}
+          disabled={rows.length === 0}
+          className={copied ? "animate-soft-pop" : ""}
+        >
           {copied ? (
             <Check className="size-4" aria-hidden="true" />
           ) : (
@@ -107,8 +112,8 @@ export function ExportStep({
         </Button>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-        <div className="border-b border-zinc-200 px-4 py-3 text-sm font-medium text-zinc-700 dark:border-zinc-800 dark:text-zinc-300">
+      <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-polished dark:border-zinc-800 dark:bg-zinc-950">
+        <div className="border-b border-zinc-200 bg-zinc-50/70 px-4 py-3 text-sm font-medium text-zinc-700 dark:border-zinc-800 dark:bg-zinc-900/50 dark:text-zinc-300">
           Output preview
         </div>
         <pre className="max-h-[520px] overflow-auto p-4 text-xs leading-6 text-zinc-700 dark:text-zinc-300">
