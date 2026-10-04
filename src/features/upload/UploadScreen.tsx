@@ -3,6 +3,7 @@ import { FileSpreadsheet, Lock, Upload } from "lucide-react";
 import { Logo } from "../../components/Logo";
 import { ThemeToggle } from "../../components/ThemeToggle";
 import { Button } from "../../components/ui";
+import { WorkflowSwitch } from "../../components/WorkflowSwitch";
 
 type ThemeMode = "system" | "light" | "dark";
 
@@ -13,6 +14,7 @@ type UploadScreenProps = {
   onSample: () => void;
   error?: string;
   isParsing: boolean;
+  onCompare: () => void;
 };
 
 export function UploadScreen({
@@ -22,6 +24,7 @@ export function UploadScreen({
   onSample,
   error,
   isParsing,
+  onCompare,
 }: UploadScreenProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -49,6 +52,9 @@ export function UploadScreen({
       </header>
 
       <main className="mx-auto flex w-full max-w-6xl flex-col px-5 pb-14 pt-10 sm:px-8 sm:pt-14 lg:pt-20">
+        <div className="mb-7 flex justify-center">
+          <WorkflowSwitch value="map" onChange={(value) => { if (value === "compare") onCompare(); }} />
+        </div>
         <section className="animate-enter mx-auto w-full max-w-3xl text-center">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-zinc-200/90 bg-white/80 px-3 py-1.5 text-sm text-zinc-600 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70 dark:text-zinc-300">
             <Lock className="size-3.5 text-accent-600" aria-hidden="true" />

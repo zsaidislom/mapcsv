@@ -33,7 +33,9 @@ describe("admin auth helpers", () => {
 
   it("rejects a tampered session", async () => {
     const session = await createAdminSessionToken("session-secret", Date.UTC(2026, 9, 2));
-    const tampered = `${session.token.slice(0, -1)}x`;
+    const [payload, signature] = session.token.split(".");
+    const tamperedSignature = `${signature[0] === "a" ? "b" : "a"}${signature.slice(1)}`;
+    const tampered = `${payload}.${tamperedSignature}`;
 
     await expect(
       verifyAdminSessionToken(tampered, "session-secret", Date.UTC(2026, 9, 2)),

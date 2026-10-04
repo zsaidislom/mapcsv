@@ -55,6 +55,52 @@ Upload -> Preview -> Map -> Validate -> Export
 - Local-first CSV processing
 - Open source under MIT
 
+## CSV Reconcile Beta
+
+The **Compare CSV** workflow is available alongside the existing, unchanged
+**Map CSV** workflow.
+
+```text
+Before + After CSV -> Match columns -> Keys & fields -> Results / Export
+```
+
+- Matching header names are mapped automatically; renamed columns can be paired manually.
+- Choose one key or a composite key. Comparison is exact and case-sensitive, without
+  trimming, type conversion, fuzzy matching, or Unicode normalization.
+- Missing, empty/whitespace-only and duplicate keys are reported before comparison.
+  All rows for a duplicated key, including unique counterparts in the other file,
+  are excluded from Added/Removed/Changed/Unchanged counts. No duplicate is chosen.
+- Compare all mapped non-key fields by default; exclude fields such as timestamps.
+  Unmapped columns do not participate. With no comparison fields, only key existence is checked.
+- Results have category filters, per-field before/after values, and 25-record pages.
+  Issues can be inspected with their complete local record values.
+- Download `added.csv`, `removed.csv`, `changed.csv`, or a standalone HTML report.
+  Changed CSV uses one row per changed field, with presence flags distinguishing
+  missing cells from empty values. Added/removed exports retain the corresponding
+  source columns. Formula-like CSV cells and headers are escaped for spreadsheet safety.
+  The HTML report escapes untrusted text and has no scripts or external assets.
+- Named profiles persist only mappings, key selection and excluded fields, plus
+  profile name/id, in `mapcsv-compare-profiles-v1` localStorage. They can be applied
+  to compatible files or deleted. CSV records and filenames are never saved there.
+
+Parsing, indexing, reconciliation and export generation run in a browser Web Worker,
+not the Cloudflare Worker. The worker owns the datasets; React receives metadata and
+only the current results page. Closing Compare clears the worker's datasets. No Compare
+events or CSV-derived metadata are sent to analytics. Existing Map analytics remain unchanged.
+Downloaded reports do contain CSV data; review them before sharing.
+
+Beta limits: 10 MiB/file, 50,000 data records/file, 100 columns, 1,000,000 cells/file,
+20,000 characters/cell (including headers), 100,000 changed cells/comparison,
+20 MB/export, and 20 saved profiles. Files must have unique, nonblank headers;
+header-only files are supported. Malformed quotes and extra cells are rejected;
+short records retain missing-cell semantics. Blank lines are skipped and displayed
+record numbers include the header (not physical line numbers for multiline values).
+Browser Web Worker support is required; failed or timed-out workers require reselecting
+both files. These limits reduce memory risk but are not a guarantee on low-memory devices.
+
+Tests: `src/lib/reconcile/reconcile.test.ts`. The original Map parser, validation,
+exports, Worker API, D1 schema/bindings, authentication and deployment remain unchanged.
+
 ## Privacy
 
 CSV parsing, mapping, validation, and export generation happen locally in your browser.

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { AdminDashboard } from "./admin/AdminDashboard";
 import { UploadScreen } from "./features/upload/UploadScreen";
 import { sampleCsv } from "./data/sampleCsv";
@@ -10,6 +10,7 @@ import type { ColumnMapping, CsvDataset, StepId } from "./types";
 import type { WorkflowType } from "./lib/analyticsSchema";
 
 type ThemeMode = "system" | "light" | "dark";
+const CompareWorkspace = lazy(() => import("./features/compare/CompareWorkspace"));
 
 const stepOrder: StepId[] = ["upload", "preview", "mapping", "validation", "export"];
 
@@ -35,6 +36,7 @@ function datasetError(dataset: CsvDataset): string | null {
 }
 
 export default function App() {
+  const [workflow, setWorkflow] = useState<"map" | "compare">("map");
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => getInitialTheme());
   const [dataset, setDataset] = useState<CsvDataset | null>(null);
   const [mappings, setMappings] = useState<ColumnMapping[]>([]);
@@ -151,6 +153,18 @@ export default function App() {
     setError(undefined);
   }
 
+  if (workflow === "compare") {
+    return (
+      <Suspense fallback={<p role="status" className="p-8">Loading Compare CSV...</p>}>
+        <CompareWorkspace
+          themeMode={themeMode}
+          onThemeChange={setThemeMode}
+          onMap={() => setWorkflow("map")}
+        />
+      </Suspense>
+    );
+  }
+
   if (!dataset) {
     return (
       <UploadScreen
@@ -160,6 +174,7 @@ export default function App() {
         onSample={handleSample}
         error={error}
         isParsing={isParsing}
+        onCompare={() => setWorkflow("compare")}
       />
     );
   }
