@@ -1,4 +1,5 @@
 import Papa from "papaparse";
+import { buildComparisonScope } from "./scope";
 import type { Comparison, Dataset, ExportFormat, Rules } from "./types";
 
 export function escapeHtml(value: string): string {
@@ -43,6 +44,7 @@ export function exportComparisonHtml(before: Dataset, after: Dataset, rules: Rul
   const e = escapeHtml;
   const text = boundedText();
   const { append } = text;
+  const scope = buildComparisonScope(before, after, rules);
   const value = (text: string | undefined) => text === undefined ? "<em>Missing cell</em>" : text === "" ? "<em>Empty</em>" : e(text);
   const record = (dataset: Dataset, index: number) => `<dl>${dataset.columns.map((column, i) => `<dt>${e(column)}</dt><dd>${value(dataset.rows[index][i])}</dd>`).join("")}</dl>`;
   const identifier = (values: string[], side: "before" | "after") => `<dl>${values.map((entry, index) => {
@@ -57,13 +59,19 @@ export function exportComparisonHtml(before: Dataset, after: Dataset, rules: Rul
     body{font:15px system-ui,sans-serif;max-width:1100px;margin:32px auto;padding:0 20px;color:#18181b}
     h1{font-size:28px}table{border-collapse:collapse;width:100%;table-layout:fixed}
     th,td{border:1px solid #d4d4d8;text-align:left;padding:12px;vertical-align:top;overflow-wrap:anywhere;white-space:pre-wrap}
-    th{background:#f4f4f5}dt{font-weight:600}dd{margin:0 0 8px;white-space:pre-wrap}
+    th{background:#f4f4f5}dt{font-weight:600}dd{margin:0 0 8px;white-space:pre-wrap}li{margin:5px 0}
     del{background:#fee2e2;text-decoration:none}ins{background:#d1fae5;text-decoration:none}section{margin-top:28px}
     </style></head><body><h1>MapCSV comparison report</h1>
     <p>Before: ${e(before.name)}<br>After: ${e(after.name)}<br>Compared: ${e(result.createdAt)}</p>
-    <p>Row identifiers: ${rules.keys.map(e).join(" + ")}<br>Compared fields: ${rules.mappings.filter((field) => !rules.keys.includes(field.before) && !rules.excluded.includes(field.before)).map((field) => `${e(field.before)} &rarr; ${e(field.after)}`).join(", ") || "None (identifier existence only)"}</p>
     <p>${Object.entries(result.summary).filter(([, count]) => typeof count === "number").map(([key, count]) => `${e(key)}: ${count}`).join(" | ")}</p>
     <p>Exact, case-sensitive comparison. Missing, empty and ambiguous key records are excluded from the result counts. Record numbers include the header and count CSV records, not physical lines; blank lines are skipped.</p>`);
+  const mappingItems = (mappings: typeof scope.compared) => mappings.map((mapping) => `<li>${e(mapping.before)} &rarr; ${e(mapping.after)}</li>`).join("") || "<li>None</li>";
+  const notCompared = [
+    ...scope.excludedMappings.map((mapping) => `<li>Excluded mapping: ${e(mapping.before)} &rarr; ${e(mapping.after)}</li>`),
+    ...scope.unmappedBefore.map((column) => `<li>Before only: ${e(column)} (unmapped)</li>`),
+    ...scope.unmappedAfter.map((column) => `<li>After only: ${e(column)} (unmapped)</li>`),
+  ].join("") || "<li>None</li>";
+  append(`<section><h2>Comparison scope</h2><p>${scope.compared.length} ${scope.compared.length === 1 ? "field" : "fields"} compared; ${scope.notComparedSourceColumns} ${scope.notComparedSourceColumns === 1 ? "source column" : "source columns"} not compared.</p><h3>Row identifiers</h3><ul>${mappingItems(scope.identifiers)}</ul><h3>Compared fields</h3><ul>${mappingItems(scope.compared)}</ul><h3>Not compared</h3><ul>${notCompared}</ul></section>`);
   append(`<p>Identifier issues: ${Object.entries(result.summary.keyIssues).map(([kind, count]) => `${kind}: ${count}`).join(" | ")}</p>`);
   append("<section><h2>Changes</h2><table><thead><tr><th>Status / identifier</th><th>Before</th><th>After</th></tr></thead><tbody>");
   for (const row of result.rows) {

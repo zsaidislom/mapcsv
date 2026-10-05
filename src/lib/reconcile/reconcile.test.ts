@@ -4,6 +4,7 @@ import { autoMappings, reconcile, validateKeys, validateRules } from "./engine";
 import { parseComparisonCsv as parse } from "./parser";
 import { exportComparisonCsv, exportComparisonHtml } from "./export";
 import { createProfile, PROFILE_KEY, readProfiles, writeProfiles } from "./profiles";
+import { buildComparisonScope } from "./scope";
 import type { Dataset, Rules } from "./types";
 
 function compare(left: string, right: string, patch: Partial<Rules> = {}) {
@@ -14,6 +15,46 @@ function compare(left: string, right: string, patch: Partial<Rules> = {}) {
 }
 
 describe("exact CSV reconciliation", () => {
+  it("leaves a renamed column unmapped and does not compare its changed value", () => {
+    const before = parse("customer_id,email,name\n103,jo@example.com,Jo", "before.csv");
+    const after = parse("customer_id,email_address,name\n103,changed@example.com,Jo", "after.csv");
+    const rules: Rules = { mappings: autoMappings(before.columns, after.columns), keys: ["customer_id"], excluded: [] };
+    const scope = buildComparisonScope(before, after, rules);
+    const result = reconcile(before, after, rules);
+
+    expect(rules.mappings).toEqual([
+      { before: "customer_id", after: "customer_id" },
+      { before: "name", after: "name" },
+    ]);
+    expect(scope.unmappedBefore).toEqual(["email"]);
+    expect(scope.unmappedAfter).toEqual(["email_address"]);
+    expect(scope.notComparedSourceColumns).toBe(2);
+    expect(result.summary).toMatchObject({ changed: 0, unchanged: 1 });
+  });
+
+  it("detects the renamed-column change after an explicit mapping", () => {
+    const before = parse("customer_id,email,name\n103,jo@example.com,Jo", "before.csv");
+    const after = parse("customer_id,email_address,name\n103,changed@example.com,Jo", "after.csv");
+    const rules: Rules = {
+      mappings: [...autoMappings(before.columns, after.columns), { before: "email", after: "email_address" }],
+      keys: ["customer_id"],
+      excluded: [],
+    };
+    const scope = buildComparisonScope(before, after, rules);
+    const result = reconcile(before, after, rules);
+
+    expect(scope.unmappedBefore).toEqual([]);
+    expect(scope.unmappedAfter).toEqual([]);
+    expect(scope.compared).toContainEqual({ before: "email", after: "email_address" });
+    expect(result.summary).toMatchObject({ changed: 1, unchanged: 0 });
+    expect(result.rows[0].changes).toContainEqual({
+      beforeColumn: "email",
+      afterColumn: "email_address",
+      before: "jo@example.com",
+      after: "changed@example.com",
+    });
+  });
+
   it("classifies identical files as unchanged", () => {
     const { result } = compare("id,name\n1,Alex", "id,name\n1,Alex");
     expect(result.summary).toMatchObject({ unchanged: 1, added: 0, removed: 0, changed: 0, issues: 0 });
@@ -162,6 +203,19 @@ describe("local-only exports", () => {
     expect(html).toContain("<dt>region</dt><dd>EU</dd>");
     expect(html).not.toContain('["1","EU"]');
   });
+  it("includes compared and unmapped fields in the HTML report scope", () => {
+    const before = parse("customer_id,email,name\n103,jo@example.com,Jo", "before.csv");
+    const after = parse("customer_id,email_address,name\n103,changed@example.com,Jo", "after.csv");
+    const rules: Rules = { mappings: autoMappings(before.columns, after.columns), keys: ["customer_id"], excluded: [] };
+    const html = exportComparisonHtml(before, after, rules, reconcile(before, after, rules));
+
+    expect(html).toContain("<h2>Comparison scope</h2>");
+    expect(html).toContain("1 field compared; 2 source columns not compared.");
+    expect(html).toContain("<h3>Compared fields</h3>");
+    expect(html).toContain("name &rarr; name");
+    expect(html).toContain("Before only: email (unmapped)");
+    expect(html).toContain("After only: email_address (unmapped)");
+  });
   it("exports headers even when a category is empty", () => {
     const { before, after, result } = compare("id,name", "id,name");
     expect(exportComparisonCsv("added", before, after, result)).toBe("id,name\r\n");
@@ -185,6 +239,24 @@ describe("local rule profiles", () => {
     writeProfiles(storage, [profile]);
     expect(readProfiles(storage)).toEqual([profile]);
     expect(values.get(PROFILE_KEY)).not.toMatch(/secret row|private.csv|filename|rows/);
+  });
+  it("restores comparison-scope metadata from a saved profile", () => {
+    const before = { columns: ["customer_id", "email", "status"] };
+    const after = { columns: ["customer_id", "email_address", "status"] };
+    const profile = createProfile("Customer audit", {
+      mappings: [
+        { before: "customer_id", after: "customer_id" },
+        { before: "email", after: "email_address" },
+        { before: "status", after: "status" },
+      ],
+      keys: ["customer_id"],
+      excluded: ["status"],
+    });
+    const scope = buildComparisonScope(before, after, profile.rules);
+
+    expect(scope.compared).toEqual([{ before: "email", after: "email_address" }]);
+    expect(scope.excludedMappings).toEqual([{ before: "status", after: "status" }]);
+    expect(scope.notComparedSourceColumns).toBe(2);
   });
   it("rejects corrupt or extra stored data instead of silently applying it", () => {
     expect(() => readProfiles({ getItem: () => "{bad" })).toThrow(/could not be read/);

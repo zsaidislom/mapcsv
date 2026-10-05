@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { ResultPage, Rules, Summary } from "../../lib/reconcile/types";
+import { buildComparisonScope } from "../../lib/reconcile/scope";
+import { ColumnMappingSummary, ComparisonScopeDisclosure, NoDifferencesNotice } from "./ComparisonScope";
 import { ResultsTable } from "./ResultsTable";
 import {
   getDefaultResultView,
@@ -115,5 +117,52 @@ describe("Compare CSV presentation behavior", () => {
     expect(markup).toContain("inactive");
     expect(markup).toContain("active");
     expect(markup).toContain("Full record details");
+  });
+
+  it("communicates unmapped columns and their consequence in the Columns step", () => {
+    const scope = buildComparisonScope(
+      { columns: ["customer_id", "email", "status"] },
+      { columns: ["customer_id", "email_address", "status"] },
+      { mappings: [{ before: "customer_id", after: "customer_id" }, { before: "status", after: "status" }], keys: [], excluded: [] },
+    );
+    const markup = renderToStaticMarkup(<ColumnMappingSummary scope={scope} />);
+
+    expect(markup).toContain("2 field mappings");
+    expect(markup).toContain("2 unmapped source columns");
+    expect(markup).toContain("Unmapped columns will not be checked for changes.");
+  });
+
+  it("renders accessible comparison-scope details beside Results", () => {
+    const scope = buildComparisonScope(
+      { columns: ["customer_id", "email", "status", "updated_at"] },
+      { columns: ["customer_id", "email_address", "status", "updated_at"] },
+      {
+        mappings: [
+          { before: "customer_id", after: "customer_id" },
+          { before: "status", after: "status" },
+          { before: "updated_at", after: "updated_at" },
+        ],
+        keys: ["customer_id"],
+        excluded: ["updated_at"],
+      },
+    );
+    const markup = renderToStaticMarkup(<ComparisonScopeDisclosure scope={scope} />);
+
+    expect(markup).toContain("Comparison scope");
+    expect(markup).toContain("1 field compared");
+    expect(markup).toContain("4 source columns not compared");
+    expect(markup).toContain("customer_id");
+    expect(markup).toContain("status");
+    expect(markup).toContain("Excluded:");
+    expect(markup).toContain("Before only:");
+    expect(markup).toContain("email");
+    expect(markup).toContain("After only:");
+    expect(markup).toContain("email_address");
+  });
+
+  it("scopes the no-differences wording to fields that were checked", () => {
+    const markup = renderToStaticMarkup(<NoDifferencesNotice />);
+    expect(markup).toContain("No differences found in the compared fields");
+    expect(markup).toContain("review exactly what was and was not checked");
   });
 });
