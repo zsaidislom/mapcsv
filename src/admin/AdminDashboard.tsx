@@ -12,6 +12,10 @@ import {
 import { Logo } from "../components/Logo";
 import { Button, Stat } from "../components/ui";
 import { APP_VERSION } from "../lib/analyticsSchema";
+import {
+  isAnalyticsExcluded,
+  setAnalyticsExcluded,
+} from "../lib/analyticsExclusion";
 
 type RangeKey = "today" | "7d" | "30d" | "all";
 
@@ -73,6 +77,9 @@ export function AdminDashboard() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState<string>();
   const [isLoginPending, setIsLoginPending] = useState(false);
+  const [excludeThisBrowser, setExcludeThisBrowser] = useState(() =>
+    isAnalyticsExcluded(window.localStorage),
+  );
   const trendMax = useMemo(() => maxTrend(summary), [summary]);
 
   useEffect(() => {
@@ -182,6 +189,11 @@ export function AdminDashboard() {
     setRefreshToken((current) => current + 1);
   }
 
+  function updateAnalyticsExclusion(excluded: boolean) {
+    setAnalyticsExcluded(window.localStorage, excluded);
+    setExcludeThisBrowser(excluded);
+  }
+
   return (
     <div className="min-h-screen bg-zinc-50 text-zinc-950 dark:bg-zinc-950 dark:text-zinc-50">
       <header className="border-b border-zinc-200 bg-white dark:border-zinc-850 dark:bg-zinc-950">
@@ -283,6 +295,35 @@ export function AdminDashboard() {
           <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
             {error}
           </div>
+        ) : null}
+
+        {authState === "authenticated" ? (
+          <section
+            className="flex flex-col justify-between gap-4 rounded-md border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-950 sm:flex-row sm:items-center"
+            aria-labelledby="internal-testing-title"
+          >
+            <div>
+              <h2 id="internal-testing-title" className="text-sm font-semibold">
+                Internal testing
+              </h2>
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                Events from this browser won't be included in product analytics while this is
+                enabled.
+              </p>
+              <p className="mt-2 text-xs font-medium text-zinc-600 dark:text-zinc-300" role="status">
+                {excludeThisBrowser ? "Internal traffic excluded" : "Analytics active"}
+              </p>
+            </div>
+            <label className="flex cursor-pointer items-center gap-3 text-sm font-medium">
+              <input
+                type="checkbox"
+                checked={excludeThisBrowser}
+                onChange={(event) => updateAnalyticsExclusion(event.target.checked)}
+                className="size-4 rounded border-zinc-300 accent-accent-600 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2 dark:border-zinc-700 dark:focus:ring-offset-zinc-950"
+              />
+              Exclude this browser from analytics
+            </label>
+          </section>
         ) : null}
 
         {!showLogin && isLoading ? (

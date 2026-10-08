@@ -7,6 +7,7 @@ import {
   type WorkflowType,
 } from "./analyticsSchema";
 import { getAttributionFromLocation } from "./analyticsAttribution";
+import { isAnalyticsExcluded } from "./analyticsExclusion";
 
 const visitorKey = "mapcsv-visitor-id";
 const sessionKey = "mapcsv-session-id";
@@ -55,6 +56,13 @@ export function createAnalyticsClient(): AnalyticsClient {
 
   return {
     track(eventName, options) {
+      if (
+        window.location.pathname.startsWith("/admin") ||
+        isAnalyticsExcluded(window.localStorage)
+      ) {
+        return;
+      }
+
       const payload = createPayload(
         eventName,
         options?.workflowType ?? "none",
